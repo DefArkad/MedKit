@@ -1,25 +1,19 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, Query, APIRouter
+
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 import jwt
 from typing import Annotated
-from fastapi.security import OAuth2PasswordBearer
-from typing import Annotated 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
-from fastapi import Depends
-from src.config.database.db_config import get_db, engine, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM, pwd_context, oauth2_scheme
-import os
 from dotenv import load_dotenv
+
+from src.config.database.db_config import get_db, engine, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM, pwd_context, oauth2_scheme
+from src.models import users
+
 
 
 db_dep = Annotated[Session, Depends(get_db)]
-
-
-from src.models import users
 
 
 router = APIRouter()
