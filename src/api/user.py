@@ -1,37 +1,19 @@
 from fastapi import Depends, HTTPException, Query, APIRouter
-
-from pydantic import BaseModel
-from datetime import datetime, timedelta, timezone
-import jwt
 from typing import Annotated
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
-from dotenv import load_dotenv
 
-from src.config.database.db_config import get_db, engine, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, ALGORITHM, pwd_context, oauth2_scheme
 from src.models import users
-
-
+from sqlalchemy.orm import Session
+from src.config.database.db_config import get_db, pwd_context, engine
+from src.models import users
+from src.schemas.user import UserCreate
+from src.core.token import create_access_token
+from src.dependencies import get_current_user, RoleChecker
 
 db_dep = Annotated[Session, Depends(get_db)]
 
-
 router = APIRouter()
-
-load_dotenv()
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    # Используем время с учетом часового пояса (timezone.utc)
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    
-    # Генерируем токен через PyJWT
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-class UserCreate(BaseModel):
-    username: Annotated[str, Query(min_length=3, max_length=20, pattern="^[a-zA-Z0-9_-]+$")] = None
-    password: Annotated[str | None, Query(min_length=3, max_length=50)] = None,
 
 
 @router.post("/register")
@@ -68,31 +50,7 @@ def login_user(user_data: UserCreate, db: Session = Depends(get_db)):
     # 5. Возвращаем токен фронтенду
     return {"access_token": access_token, "token_type": "bearer"}
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: db_dep):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Не удалось подтвердить личность",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        # 1. Расшифровываем токен
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        
-        if username is None:
-            raise credentials_exception
-            
-    except jwt.PyJWTError:
-        # Если токен подделан, просрочен или поврежден
-        raise credentials_exception
 
-    # 2. Ищем пользователя в базе данных
-    user = db.query(users.User).filter(users.User.username == username).first()
-    
-    if user is None:
-        raise credentials_exception
-        
-    return user # Возвращаем полноценный объект пользователя из БД
 
 # Убедись, что тут написано именно /users/me (со всеми слэшами)
 @router.get("/users/me") 
@@ -109,15 +67,9 @@ def return_all_user():
         
     return {"total_users": count}
 
-def get_current_role(current_user: Annotated[users.User, Depends(get_current_user)], db: Session = Depends(get_db)):
-    role = db.query(users.User).filter(users.User.role == current_user.role).first()
-
-    if not role.role=="Admin":
-        raise HTTPException(status_code=400, detail="У вас недостаточно прав")
-    return role
-
+# Теперь используем в роуте
 @router.get("/home/admin_panel")
-def admin_panel(current_role: Annotated[users.User, Depends(get_current_role)]):
+def admin_panel(current_role: Annotated[users.User, Depends(RoleChecker(need_role="Admin"))]):
     return {
         "role": current_role.role
     }
