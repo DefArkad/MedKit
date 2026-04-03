@@ -13,30 +13,31 @@
         <div id="user-info" class="bg-slate-700 p-4 rounded-lg mb-6 hidden">
             <p class="text-sm text-slate-300">Твой ID: <span id="user-id" class="text-blue-400"></span></p>
             <p class="text-sm text-slate-300">Логин: <span id="user-name" class="text-blue-400"></span></p>
+            <p id="role-container" class="text-sm text-slate-300 hidden">Роль: <span id="user-role" class="text-green-400 font-bold"></span></p>
         </div>
 
-        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition">
-            Выйти из системы
-        </button>
+        <div class="flex flex-col gap-3">
+            <button onclick="getAdminPanelInfo()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition">
+                Админ панель
+            </button>
+
+            <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition">
+                Выйти из системы
+            </button>
+        </div>
     </div>
 
     <script>
-        // Функция проверки авторизации при загрузке страницы
         async function checkAuth() {
             const token = localStorage.getItem('token');
-            
             if (!token) {
-                // Если токена нет — на выход
                 window.location.href = 'index.html';
                 return;
             }
 
-            // Пытаемся получить данные о себе с бэкенда (используем наш роут /users/me)
             try {
                 const response = await fetch('http://127.0.0.1:8000/users/me', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (response.ok) {
@@ -45,11 +46,36 @@
                     document.getElementById('user-id').innerText = userData.id;
                     document.getElementById('user-name').innerText = userData.username;
                 } else {
-                    // Если токен "протух" или неверный
                     logout();
                 }
             } catch (error) {
                 console.error("Ошибка связи с сервером");
+            }
+        }
+
+        // Новая функция для кнопки "Админ панель"
+        async function getAdminPanelInfo() {
+            const token = localStorage.getItem('token');
+            try {
+                // Обращаемся к твоему новому роуту
+                const response = await fetch('http://127.0.0.1:8000/home/admin_panel', {
+                    headers: { 
+                        'Authorization': `Bearer ${token}` 
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    // Отображаем блок с ролью и вставляем значение
+                    document.getElementById('role-container').classList.remove('hidden');
+                    document.getElementById('user-role').innerText = data.role;
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.detail || "Доступ запрещен");
+                }
+            } catch (error) {
+                console.error("Ошибка при запросе к админ панели:", error);
+                alert("Ошибка соединения с сервером");
             }
         }
 
@@ -58,7 +84,6 @@
             window.location.href = 'index.html';
         }
 
-        // Запускаем проверку сразу
         checkAuth();
     </script>
 </body>

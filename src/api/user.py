@@ -108,3 +108,19 @@ def return_all_user():
         count = session.execute(stmt).scalar()
         
     return {"total_users": count}
+
+def get_current_role(current_user: Annotated[users.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+    role = db.query(users.User).filter(users.User.role == current_user.role).first()
+
+    if not role.role=="Admin":
+        raise HTTPException(status_code=400, detail="У вас недостаточно прав")
+    return role
+
+@router.get("/home/admin_panel")
+def admin_panel(current_role: Annotated[users.User, Depends(get_current_role)]):
+    return {
+        "role": current_role.role
+    }
+                
+
+
