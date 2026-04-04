@@ -1,13 +1,12 @@
-from fastapi import Depends, HTTPException, Query, APIRouter
+from fastapi import Depends, HTTPException, Query, APIRouter, status
 from typing import Annotated
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
 from src.models import users
-from sqlalchemy.orm import Session
 from src.config.database.db_config import get_db, pwd_context, engine
 from src.models import users
-from src.schemas.user import UserCreate
+from src.schemas.user import UserCreate, UserRoleUpdate
 from src.core.token import create_access_token
 from src.dependencies import get_current_user, RoleChecker
 
@@ -73,6 +72,30 @@ def admin_panel(current_role: Annotated[users.User, Depends(RoleChecker(need_rol
     return {
         "role": current_role.role
     }
-                
+@router.patch("/home/change-role")
+def change_user_role(
+    role_data: UserRoleUpdate, 
+    db: Session = Depends(get_db),
+    # Только админ может изменять чужие роли
+    current_admin: users.User = Depends(RoleChecker(need_role="Admin"))
+):
+    # 1. Ищем пользователя, роль которого хотим изменить
+    target_user = db.query(users.User).filter(users.User.id == role_data.user_id).first()
+    
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь с таким ID не найден"
+        )
 
+    # 2. Обновляем роль
+    target_user.role = role_data.new_role
+    
+    # 3. Сохраняем изменения в БД
+    db.commit()
+    db.refresh(target_user)
 
+    return {
+        "message": f"Роль пользователя {target_user.username} успешно изменена на {target_user.role}",
+        "updated_user_id": target_user.id
+    }

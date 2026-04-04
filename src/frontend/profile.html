@@ -21,6 +21,10 @@
                 Админ панель
             </button>
 
+            <button id="change-role-btn" onclick="changeRolePrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition hidden">
+                Изменить роль пользователя
+            </button>
+
             <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition">
                 Выйти из системы
             </button>
@@ -53,28 +57,61 @@
             }
         }
 
-        // Новая функция для кнопки "Админ панель"
         async function getAdminPanelInfo() {
             const token = localStorage.getItem('token');
             try {
-                // Обращаемся к твоему новому роуту
                 const response = await fetch('http://127.0.0.1:8000/home/admin_panel', {
-                    headers: { 
-                        'Authorization': `Bearer ${token}` 
-                    }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    // Отображаем блок с ролью и вставляем значение
                     document.getElementById('role-container').classList.remove('hidden');
                     document.getElementById('user-role').innerText = data.role;
+                    
+                    // ПОЯВЛЕНИЕ КНОПКИ: Находим кнопку по ID и убираем скрывающий класс
+                    document.getElementById('change-role-btn').classList.remove('hidden');
                 } else {
                     const errorData = await response.json();
                     alert(errorData.detail || "Доступ запрещен");
                 }
             } catch (error) {
                 console.error("Ошибка при запросе к админ панели:", error);
+                alert("Ошибка соединения с сервером");
+            }
+        }
+
+        async function changeRolePrompt() {
+            const userId = prompt("Введите ID пользователя, которому нужно изменить роль:");
+            if (!userId) return;
+
+            const newRole = prompt("Введите новую роль (например: Admin, User):");
+            if (!newRole) return;
+
+            const token = localStorage.getItem('token');
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/home/change-role', {
+                    method: 'PATCH',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({
+                        user_id: parseInt(userId),
+                        new_role: newRole
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(data.message);
+                } else {
+                    alert("Ошибка: " + (data.detail || "Не удалось изменить роль"));
+                }
+            } catch (error) {
+                console.error("Ошибка запроса:", error);
                 alert("Ошибка соединения с сервером");
             }
         }
