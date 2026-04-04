@@ -1,13 +1,14 @@
-from fastapi import Depends, HTTPException, Query, APIRouter
+from fastapi import Depends, HTTPException, Query, APIRouter, status
 from typing import Annotated
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
+from pydantic import Field, ValidationError
+import re
 
 from src.models import users
-from sqlalchemy.orm import Session
 from src.config.database.db_config import get_db, pwd_context, engine
 from src.models import users
-from src.schemas.user import UserCreate
+from src.schemas.user import UserCreate, UserRoleUpdate
 from src.core.token import create_access_token
 from src.dependencies import get_current_user, RoleChecker
 
@@ -18,13 +19,14 @@ router = APIRouter()
 
 @router.post("/register")
 def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(users.User).filter(users.User.username == user_data.username).first()
+    db_user = db.query(users.User).filter(users.User.username == user_data.username).first() and db.query(users.User).filter(users.User.mail == user_data.mail).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Пользователь уже существует")
+    
 
     hashed_pwd = pwd_context.hash(user_data.password)
 
-    new_user = users.User(username=user_data.username, hashed_password=hashed_pwd)
+    new_user = users.User(username=user_data.username, mail = user_data.mail, hashed_password=hashed_pwd)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -34,7 +36,13 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login")
 def login_user(user_data: UserCreate, db: Session = Depends(get_db)):
     # 1. Ищем пользователя по имени
-    user = db.query(users.User).filter(users.User.username == user_data.username).first()
+    #email_pattern = r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'
+    
+    if re.match(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$', user_data.username):
+        user = db.query(users.User).filter(users.User.mail == user_data.username).first()
+    else:
+        user = db.query(users.User).filter(users.User.username == user_data.username).first()
+
     
     # 2. Если пользователя нет
     if not user:
@@ -73,6 +81,34 @@ def admin_panel(current_role: Annotated[users.User, Depends(RoleChecker(need_rol
     return {
         "role": current_role.role
     }
-                
+@router.patch("/home/change-role")
+def change_user_role(
+    role_data: UserRoleUpdate, 
+    db: Session = Depends(get_db),
+    # Только админ может изменять чужие роли
+    current_admin: users.User = Depends(RoleChecker(need_role="Admin"))
+):
+    # 1. Ищем пользователя, роль которого хотим изменить
+    target_user = db.query(users.User).filter(users.User.id == role_data.user_id).first()
+    if not role_data.new_role in ["Admin", "User"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Выберите коректную роль"
+        )
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь с таким ID не найден"
+        )
 
+    # 2. Обновляем роль
+    target_user.role = role_data.new_role
+    
+    # 3. Сохраняем изменения в БД
+    db.commit()
+    db.refresh(target_user)
 
+    return {
+        "message": f"Роль пользователя {target_user.username} успешно изменена на {target_user.role}",
+        "updated_user_id": target_user.id
+    }
