@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Моя Аутентификация</title>
+    <script defer src="../static/js/index.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 flex items-center justify-center h-screen">
@@ -12,13 +13,8 @@
         <form id="auth-form" class="space-y-4">
             <input type="text" id="username" placeholder="Имя пользователя" required 
                    class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            
-            <input type="email" id="mail" placeholder="Электронная почта" 
-                   class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
-            
             <input type="password" id="password" placeholder="Пароль" required 
                    class="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            
             <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
                 Отправить
             </button>
@@ -31,77 +27,5 @@
         </div>
         <div id="status" class="mt-4 text-center text-sm hidden"></div>
     </div>
-
-    <script>
-        const form = document.getElementById('auth-form');
-        const toggleBtn = document.getElementById('toggle-mode');
-        const statusDiv = document.getElementById('status');
-        const mailInput = document.getElementById('mail');
-        let isLogin = true;
-
-        // Переключение между Входом и Регистрацией
-        toggleBtn.onclick = () => {
-            isLogin = !isLogin;
-            document.getElementById('title').innerText = isLogin ? "Вход" : "Регистрация";
-            toggleBtn.innerText = isLogin ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти";
-            statusDiv.classList.add('hidden');
-            
-            // Показываем или скрываем поле почты
-            if (isLogin) {
-                mailInput.classList.add('hidden');
-                mailInput.removeAttribute('required');
-            } else {
-                mailInput.classList.remove('hidden');
-                mailInput.setAttribute('required', '');
-            }
-        };
-
-        form.onsubmit = async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const mail = mailInput.value;
-            
-            const endpoint = isLogin ? '/login' : '/register';
-            
-            // Формируем тело запроса
-            const bodyData = { username, password };
-            if (!isLogin) {
-                bodyData.mail = mail; // Добавляем почту только при регистрации
-            }
-            
-            try {
-                const response = await fetch(`http://127.0.0.1:8000${endpoint}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bodyData)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showStatus(isLogin ? "Успешный вход!" : "Вы успешно зарегистрированы!", "green");
-                    
-                    if (data.access_token) {
-                        localStorage.setItem('token', data.access_token);
-                        setTimeout(() => {
-                            window.location.href = 'profile.html';
-                        }, 1000);
-                    }
-                } else {
-                    // Выводим ошибку от бэкенда (например, если почта не прошла валидацию)
-                    showStatus(data.detail || "Ошибка запроса", "red");
-                }
-            } catch (error) {
-                showStatus("Сервер не отвечает. Проверь, запущен ли uvicorn!", "red");
-            }
-        };
-
-        function showStatus(text, color) {
-            statusDiv.innerText = text;
-            statusDiv.className = `mt-4 text-center text-sm font-bold text-${color}-600`;
-            statusDiv.classList.remove('hidden');
-        }
-    </script>
 </body>
 </html>
