@@ -9,3 +9,7 @@ class UserCreate(BaseModel):
 class UserRoleUpdate(BaseModel):
     user_id: int
     new_role: str
+class MedicationsCreate(BaseModel):
+    name: str
+    description: str | None
+    prescription_required: bool

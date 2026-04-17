@@ -28,6 +28,50 @@
             <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition">
                 Выйти из системы
             </button>
+            <button id="add-med-btn" onclick="addMedicationPrompt()" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition hidden">
+    Добавить лекарство
+</button>
+
+<script>
+    // Добавьте это в функцию getAdminPanelInfo() внутри if (response.ok)
+    // Чтобы кнопка появлялась только у тех, у кого есть доступ к админ-панели/роли Доктора
+    document.getElementById('add-med-btn').classList.remove('hidden');
+
+    async function addMedicationPrompt() {
+        const name = prompt("Введите название лекарства:");
+        if (!name) return;
+
+        const description = prompt("Введите описание:");
+        const prescription_q = confirm("Требуется ли рецепт?");
+
+        const token = localStorage.getItem('token');
+        
+        try {
+            const response = await fetch('http://127.0.0.1:8000/home/add-medications', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({
+                    name: name,
+                    description: description,
+                    prescription: prescription_q // Убедитесь, что имя поля совпадает с вашей схемой
+                })
+            });
+
+            if (response.ok) {
+                alert("Лекарство успешно добавлено!");
+            } else {
+                const errorData = await response.json();
+                alert("Ошибка: " + (errorData.detail || "Не удалось добавить"));
+            }
+        } catch (error) {
+            console.error("Ошибка запроса:", error);
+            alert("Ошибка соединения с сервером");
+        }
+    }
+</script>
         </div>
     </div>
 

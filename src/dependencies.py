@@ -4,6 +4,8 @@ import jwt
 from src.config.database.db_config import get_db, SECRET_KEY, ALGORITHM, oauth2_scheme
 from src.models import users
 from sqlalchemy.orm import Session
+from transliterate import translit
+from src.schemas.user import UserCreate
 
 
 db_dep = Annotated[Session, Depends(get_db)]
@@ -46,3 +48,5 @@ class RoleChecker:
             )
         return current_user
     
+def generate_username(user_data: UserCreate):
+    return translit(user_data.username, language_code='ru', reversed=False)

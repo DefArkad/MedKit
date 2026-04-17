@@ -3,7 +3,6 @@ from src.api import main_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.staticfiles import StaticFiles
-from src.api import main_router
 
 app = FastAPI()
 app.include_router(main_router)
@@ -24,7 +23,6 @@ app.add_middleware(
     allow_headers=["*"], # Разрешает все заголовки
 )
 
-app.include_router(main_router)
 
 # 3. Монтируем фронтенд (как я советовал ранее)
 app.mount("/", StaticFiles(directory="src/frontend", html=True), name="frontend")
