@@ -1,2 +1,6 @@
 venv/
-__pycache__/
+<<<<<<< HEAD
+src/api/_pycache__/
+=======
+src/api/__pycache__/
+>>>>>>> main

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Личный кабинет</title>
+    <script src="../static/js/profile.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white flex items-center justify-center h-screen">
@@ -28,100 +29,51 @@
             <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition">
                 Выйти из системы
             </button>
+            <button id="add-med-btn" onclick="addMedicationPrompt()" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition hidden">
+    Добавить лекарство
+</button>
+
+<script>
+    // Добавьте это в функцию getAdminPanelInfo() внутри if (response.ok)
+    // Чтобы кнопка появлялась только у тех, у кого есть доступ к админ-панели/роли Доктора
+    document.getElementById('add-med-btn').classList.remove('hidden');
+
+    async function addMedicationPrompt() {
+        const name = prompt("Введите название лекарства:");
+        if (!name) return;
+
+        const description = prompt("Введите описание:");
+        const prescription_q = confirm("Требуется ли рецепт?");
+
+        const token = localStorage.getItem('token');
+        
+        try {
+            const response = await fetch('http://127.0.0.1:8000/home/add-medications', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({
+                    name: name,
+                    description: description,
+                    prescription: prescription_q // Убедитесь, что имя поля совпадает с вашей схемой
+                })
+            });
+
+            if (response.ok) {
+                alert("Лекарство успешно добавлено!");
+            } else {
+                const errorData = await response.json();
+                alert("Ошибка: " + (errorData.detail || "Не удалось добавить"));
+            }
+        } catch (error) {
+            console.error("Ошибка запроса:", error);
+            alert("Ошибка соединения с сервером");
+        }
+    }
+</script>
         </div>
     </div>
-
-    <script>
-        async function checkAuth() {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = 'index.html';
-                return;
-            }
-
-            try {
-                const response = await fetch('http://127.0.0.1:8000/users/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    const userData = await response.json();
-                    document.getElementById('user-info').classList.remove('hidden');
-                    document.getElementById('user-id').innerText = userData.id;
-                    document.getElementById('user-name').innerText = userData.username;
-                } else {
-                    logout();
-                }
-            } catch (error) {
-                console.error("Ошибка связи с сервером");
-            }
-        }
-
-        async function getAdminPanelInfo() {
-            const token = localStorage.getItem('token');
-            try {
-                const response = await fetch('http://127.0.0.1:8000/home/admin_panel', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('role-container').classList.remove('hidden');
-                    document.getElementById('user-role').innerText = data.role;
-                    
-                    // ПОЯВЛЕНИЕ КНОПКИ: Находим кнопку по ID и убираем скрывающий класс
-                    document.getElementById('change-role-btn').classList.remove('hidden');
-                } else {
-                    const errorData = await response.json();
-                    alert(errorData.detail || "Доступ запрещен");
-                }
-            } catch (error) {
-                console.error("Ошибка при запросе к админ панели:", error);
-                alert("Ошибка соединения с сервером");
-            }
-        }
-
-        async function changeRolePrompt() {
-            const userId = prompt("Введите ID пользователя, которому нужно изменить роль:");
-            if (!userId) return;
-
-            const newRole = prompt("Введите новую роль (например: Admin, User):");
-            if (!newRole) return;
-
-            const token = localStorage.getItem('token');
-            
-            try {
-                const response = await fetch('http://127.0.0.1:8000/home/change-role', {
-                    method: 'PATCH',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}` 
-                    },
-                    body: JSON.stringify({
-                        user_id: parseInt(userId),
-                        new_role: newRole
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert(data.message);
-                } else {
-                    alert("Ошибка: " + (data.detail || "Не удалось изменить роль"));
-                }
-            } catch (error) {
-                console.error("Ошибка запроса:", error);
-                alert("Ошибка соединения с сервером");
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('token');
-            window.location.href = 'index.html';
-        }
-
-        checkAuth();
-    </script>
 </body>
 </html>
