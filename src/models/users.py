@@ -43,3 +43,4 @@ class Prescription(Base):
     is_issued = Column(Boolean, default=False) # Отметка фармацевта о выдаче
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     issued_at = Column(DateTime(timezone=True), nullable=True) # Когда выдано
+    end_date = Column(DateTime(timezone=True))

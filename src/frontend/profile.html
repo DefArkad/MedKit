@@ -32,6 +32,12 @@
             <button id="add-med-btn" onclick="addMedicationPrompt()" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition hidden">
     Добавить лекарство
 </button>
+<button id="create-prescription-btn" onclick="createPrescriptionPrompt()" class="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2 rounded-lg transition hidden">
+    Создать рецепт
+</button>
+<button id="add-pharmacy-btn" onclick="addPharmacyPrompt()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg transition hidden">
+    Добавить аптеку
+</button>
 
 <script>
     // Добавьте это в функцию getAdminPanelInfo() внутри if (response.ok)
@@ -43,7 +49,7 @@
         if (!name) return;
 
         const description = prompt("Введите описание:");
-        const prescription_q = confirm("Требуется ли рецепт?");
+        const prescription = confirm("Требуется ли рецепт?");
 
         const token = localStorage.getItem('token');
         
@@ -57,7 +63,7 @@
                 body: JSON.stringify({
                     name: name,
                     description: description,
-                    prescription: prescription_q // Убедитесь, что имя поля совпадает с вашей схемой
+                    prescription: prescription // Убедитесь, что имя поля совпадает с вашей схемой
                 })
             });
 
@@ -72,7 +78,93 @@
             alert("Ошибка соединения с сервером");
         }
     }
+    // Показываем кнопку (логика как и для добавления лекарства)
+document.getElementById('create-prescription-btn').classList.remove('hidden');
+
+async function createPrescriptionPrompt() {
+    // Сбор данных через prompt
+    const patient_id = prompt("Введите ID пациента (число):");
+    const pharmacy_id = prompt("Введите ID аптеки (число):");
+    const medication_id = prompt("Введите ID лекарства (число):");
+    const instruction = prompt("Инструкция (необязательно):");
+    const quantity = prompt("Количество (число):");
+    const end_date = prompt("Дата окончания (в формате ГГГГ-ММ-ДД ТТ:ММ):", "2024-12-31 23:59");
+
+    // Проверка на отмену (если пользователь нажал "Отмена")
+    if (!patient_id || !medication_id || !quantity || !end_date) {
+        alert("Все поля, кроме инструкции, обязательны!");
+        return;
+    }
+
+    const token = localStorage.getItem('token');
+    
+    try {
+        const response = await fetch('http://127.0.0.1:8000/home/new_drug_prescription', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({
+                patient_id: parseInt(patient_id),
+                pharmacy_id: parseInt(pharmacy_id),   // Как в твоем BaseModel
+                medication_id: parseInt(medication_id),
+                instruction: instruction || null,
+                quantity: parseInt(quantity),       // Как в твоем BaseModel
+                end_date: new Date(end_date).toISOString() // Превращаем строку в формат даты
+            })
+        });
+
+        if (response.ok) {
+            alert("Рецепт успешно создан!");
+        } else {
+            const errorData = await response.json();
+            alert("Ошибка: " + JSON.stringify(errorData.detail));
+        }
+    } catch (error) {
+        console.error("Ошибка запроса:", error);
+        alert("Ошибка соединения с сервером");
+    }
+}
+// Показываем кнопку только админам
+document.getElementById('add-pharmacy-btn').classList.remove('hidden');
+
+async function addPharmacyPrompt() {
+    const name = prompt("Введите название аптеки:");
+    if (!name) return;
+
+    const address = prompt("Введите адрес аптеки:");
+    if (!address) return;
+
+    const token = localStorage.getItem('token');
+    
+    try {
+        const response = await fetch('http://127.0.0.1:8000/home/new_pharmacies', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({
+                name: name,
+                address: address
+            })
+        });
+
+        if (response.ok) {
+            alert("Аптека успешно добавлена!");
+        } else {
+            const errorData = await response.json();
+            // Проверяем detail, так как FastAPI ошибки обычно там
+            alert("Ошибка: " + (errorData.detail || "Доступ запрещен"));
+        }
+    } catch (error) {
+        console.error("Ошибка запроса:", error);
+        alert("Ошибка соединения с сервером");
+    }
+}
 </script>
+
         </div>
     </div>
 </body>

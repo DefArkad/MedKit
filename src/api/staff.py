@@ -7,11 +7,9 @@ import re
 
 from src.models import users
 from src.config.database.db_config import get_db, pwd_context, engine
-from src.models import users
-from src.schemas.user import UserCreate, UserRoleUpdate
+from src.schemas.user import UserCreate, UserRoleUpdate, MedicationsCreate, DrugPrescriptionCreate, PcharmaciesCreate
 from src.core.token import create_access_token
 from src.dependencies import get_current_user, RoleChecker
-from src.schemas.user import MedicationsCreate
 
 db_dep = Annotated[Session, Depends(get_db)]
 
@@ -77,10 +75,37 @@ def add_medications(medications_data: MedicationsCreate, db: Session = Depends(g
     new_medication = users.Medication(
         name=medications_data.name,
         description=medications_data.description,
-        prescription_required=medications_data.prescription_required
+        prescription=medications_data.prescription
     )
     
     db.add(new_medication)
     db.commit()
     db.refresh(new_medication)
     return {"message": "Лекарство добавлено", "id": new_medication.id}
+
+@router_staff.post("/home/new_drug_prescription")
+def add_drug_prescription(
+    DataDrugPrescription: DrugPrescriptionCreate,
+    db: Session= Depends(get_db),
+    current_user: users.User = Depends(RoleChecker(need_role="Doctor"))
+):
+    target_user = db.query(users.User).filter(users.User.id == DataDrugPrescription.patient_id).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь с таким username не найден"
+        )
+    new_drug_prescription = users.Prescription(patient_id=DataDrugPrescription.patient_id,doctor_id=current_user.id, pharmacy_id=DataDrugPrescription.pharmacy_id, medication_id=DataDrugPrescription.medication_id, instruction=DataDrugPrescription.instruction, quantity=DataDrugPrescription.quantity, end_date=DataDrugPrescription.end_date)
+    db.add(new_drug_prescription)
+    db.commit()
+    db.refresh(new_drug_prescription)
+@router_staff.post("/home/new_pharmacies")
+def new_pharmacies(
+    DataPcharmacies: PcharmaciesCreate,
+    db: Session= Depends(get_db),
+    current_user: users.User = Depends(RoleChecker(need_role="Admin"))
+):
+    new_pcharmacies = users.Pharmacy(name=DataPcharmacies.name, address=DataPcharmacies.address)
+    db.add(new_pcharmacies)
+    db.commit()
+    db.refresh(new_pcharmacies)

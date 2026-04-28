@@ -72,6 +72,7 @@ def return_all_user():
     with Session(engine) as session:
         stmt = select(func.count(users.User.id))
         count = session.execute(stmt).scalar()
-        
+    
     return {"total_users": count}
 
+#@router.get("/home/active_prescriptions")
