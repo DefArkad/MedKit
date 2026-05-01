@@ -21,6 +21,9 @@
             <button onclick="getAdminPanelInfo()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition">
                 Админ панель
             </button>
+            <button onclick="getMyPrescriptions()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">
+                Мои активные рецепты
+            </button>
 
             <button id="change-role-btn" onclick="changeRolePrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition hidden">
                 Изменить роль пользователя
@@ -38,6 +41,12 @@
 <button id="add-pharmacy-btn" onclick="addPharmacyPrompt()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg transition hidden">
     Добавить аптеку
 </button>
+<div id="prescriptions-container" class="mt-6 text-left hidden">
+            <h2 class="text-xl font-bold mb-3 border-b border-slate-600 pb-2">Мои рецепты:</h2>
+            <ul id="prescriptions-list" class="space-y-3 max-h-60 overflow-y-auto">
+                <!-- Сюда с помощью JS будут добавляться рецепты -->
+            </ul>
+        </div>
 
 <script>
     // Добавьте это в функцию getAdminPanelInfo() внутри if (response.ok)
@@ -111,7 +120,14 @@ async function createPrescriptionPrompt() {
                 medication_id: parseInt(medication_id),
                 instruction: instruction || null,
                 quantity: parseInt(quantity),       // Как в твоем BaseModel
-                end_date: new Date(end_date).toISOString() // Превращаем строку в формат даты
+                body: JSON.stringify({
+    patient_id: parseInt(patient_id),
+    pharmacy_id: parseInt(pharmacy_id),
+    medication_id: parseInt(medication_id),
+    instruction: instruction || null,
+    quantity: parseInt(quantity),
+    end_date: end_date.replace(' ', 'T') // Превращаем "2024-12-31 23:59" в формат ISO
+}) // Превращаем строку в формат даты
             })
         });
 
@@ -157,6 +173,58 @@ async function addPharmacyPrompt() {
             const errorData = await response.json();
             // Проверяем detail, так как FastAPI ошибки обычно там
             alert("Ошибка: " + (errorData.detail || "Доступ запрещен"));
+        }
+    } catch (error) {
+        console.error("Ошибка запроса:", error);
+        alert("Ошибка соединения с сервером");
+    }
+}
+async function getMyPrescriptions() {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+        alert("Пожалуйста, авторизуйтесь");
+        return;
+    }
+
+    try {
+        // Делаем GET-запрос на специальный эндпоинт
+        const response = await fetch('http://127.0.0.1:8000/home/my_prescriptions', {
+            method: 'GET',
+            headers: { 
+                'Authorization': `Bearer ${token}` 
+            }
+        });
+
+        if (response.ok) {
+            const prescriptions = await response.json();
+            const listContainer = document.getElementById('prescriptions-list');
+            listContainer.innerHTML = ''; // Очищаем список перед новым рендером
+
+            if (prescriptions.length === 0) {
+                listContainer.innerHTML = '<li class="text-slate-400 text-center">У вас нет активных рецептов</li>';
+            } else {
+                prescriptions.forEach(p => {
+                    // Форматируем дату красиво
+                    const endDate = p.end_date ? new Date(p.end_date).toLocaleDateString('ru-RU') : 'Бессрочно';
+                    
+                    // Создаем карточку рецепта
+                    listContainer.innerHTML += `
+                        <li class="bg-slate-700 p-3 rounded-lg text-sm shadow">
+                            <p class="text-lg text-green-400 font-bold">${p.medication_name} <span class="text-white text-sm font-normal">(Кол-во: ${p.quantity})</span></p>
+                            <p class="text-slate-300 mt-1"><span class="font-bold">Аптека:</span> ${p.pharmacy_name}</p>
+                            ${p.instruction ? `<p class="text-slate-400 italic mt-1">Инструкция: ${p.instruction}</p>` : ''}
+                            <p class="text-red-400 mt-2 font-bold">Действителен до: ${endDate}</p>
+                        </li>
+                    `;
+                });
+            }
+            
+            // Показываем контейнер
+            document.getElementById('prescriptions-container').classList.remove('hidden');
+        } else {
+            const errorData = await response.json();
+            alert("Ошибка: " + (errorData.detail || "Не удалось загрузить рецепты"));
         }
     } catch (error) {
         console.error("Ошибка запроса:", error);

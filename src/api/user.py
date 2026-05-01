@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, Query, APIRouter, status
-from typing import Annotated
+from typing import Annotated, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, update
 from pydantic import Field, ValidationError
@@ -8,7 +8,7 @@ import re
 from src.models import users
 from src.config.database.db_config import get_db, pwd_context, engine
 from src.models import users
-from src.schemas.user import UserCreate, UserRoleUpdate
+from src.schemas.user import UserCreate, UserRoleUpdate, DrugPrescriptionDetailResponse
 from src.core.token import create_access_token
 from src.dependencies import get_current_user, RoleChecker
 
@@ -75,4 +75,38 @@ def return_all_user():
     
     return {"total_users": count}
 
-#@router.get("/home/active_prescriptions")
+from datetime import datetime, timezone
+# ... остальные импорты ...
+
+@router.get("/home/my_prescriptions", response_model=list[DrugPrescriptionDetailResponse])
+def get_my_active_prescriptions(
+    db: Session = Depends(get_db),
+    current_user: users.User = Depends(get_current_user) # Функция получения текущего юзера из токена
+):
+    current_time = datetime.now(timezone.utc)
+
+    # Строим запрос с JOIN, как делали в предыдущем шаге
+# В твоем FastAPI роуте замени .join на .outerjoin
+    prescriptions = (
+        db.query(
+            users.Prescription.id,
+            users.User.username.label("patient_username"),
+            users.Pharmacy.name.label("pharmacy_name"),
+            users.Medication.name.label("medication_name"),
+            users.Prescription.instruction,
+            users.Prescription.quantity,
+            users.Prescription.end_date
+        )
+        .outerjoin(users.User, users.Prescription.patient_id == users.User.id)
+        .outerjoin(users.Pharmacy, users.Prescription.pharmacy_id == users.Pharmacy.id)
+        .outerjoin(users.Medication, users.Prescription.medication_id == users.Medication.id)
+        #.filter(users.Prescription.patient_id == current_user.id)
+        # ФИЛЬТРУЕМ активные рецепты (где end_date больше текущего времени или пустая)
+        #.filter(
+        #    (users.Prescription.end_date > current_time) | 
+        #    (users.Prescription.end_date == None)
+        #)
+        .all()
+    )
+        
+    return prescriptions

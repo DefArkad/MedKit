@@ -99,6 +99,7 @@ def add_drug_prescription(
     db.add(new_drug_prescription)
     db.commit()
     db.refresh(new_drug_prescription)
+    
 @router_staff.post("/home/new_pharmacies")
 def new_pharmacies(
     DataPcharmacies: PcharmaciesCreate,
