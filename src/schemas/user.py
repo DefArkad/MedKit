@@ -38,3 +38,5 @@ class DrugPrescriptionDetailResponse(BaseModel):
     end_date: Optional[datetime] = None 
 
     model_config = ConfigDict(from_attributes=True)
+class SupportMessege(BaseModel):
+    messege: str
