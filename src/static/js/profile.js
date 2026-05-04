@@ -1,5 +1,5 @@
 
-const debug = 0;
+const debug = 1;
 
 async function checkAuth() {
 	if (debug){return;}
