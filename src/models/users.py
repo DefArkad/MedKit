@@ -44,3 +44,13 @@ class Prescription(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     issued_at = Column(DateTime(timezone=True), nullable=True) # Когда выдано
     end_date = Column(DateTime(timezone=True))
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))  # К какому диалогу относится
+    sender_id = Column(Integer)  # Кто именно отправил (User или Admin)
+    message = Column(String)
+    created_at = Column(DateTime, default=func.now())
+
+    

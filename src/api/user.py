@@ -1,14 +1,15 @@
-from fastapi import Depends, HTTPException, Query, APIRouter, status
-from typing import Annotated
+from fastapi import Depends, HTTPException, Query, APIRouter, status, Body
+from typing import Annotated, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, update
 from pydantic import Field, ValidationError
 import re
+from datetime import datetime, timezone
 
 from src.models import users
 from src.config.database.db_config import get_db, pwd_context, engine
 from src.models import users
-from src.schemas.user import UserCreate, UserRoleUpdate
+from src.schemas.user import UserCreate, UserRoleUpdate, DrugPrescriptionDetailResponse
 from src.core.token import create_access_token
 from src.dependencies import get_current_user, RoleChecker
 
@@ -65,7 +66,8 @@ def login_user(user_data: UserCreate, db: Session = Depends(get_db)):
 def read_users_me(current_user: Annotated[users.User, Depends(get_current_user)]):
     return {
         "id": current_user.id, 
-        "username": current_user.username
+        "username": current_user.username,
+        "role": current_user.role
     }
 @router.get("/home")
 def return_all_user():
@@ -75,4 +77,76 @@ def return_all_user():
     
     return {"total_users": count}
 
-#@router.get("/home/active_prescriptions")
+# ... остальные импорты ...
+
+@router.get("/home/my_prescriptions", response_model=list[DrugPrescriptionDetailResponse])
+def get_my_active_prescriptions(
+    db: Session = Depends(get_db),
+    current_user: users.User = Depends(get_current_user)
+):
+    # Используем простую дату без сложной логики поясов для проверки
+    current_time = datetime.now() 
+
+    prescriptions = (
+        db.query(
+            users.Prescription.id,
+            users.User.username.label("patient_username"),
+            users.Pharmacy.name.label("pharmacy_name"),
+            users.Medication.name.label("medication_name"),
+            users.Prescription.instruction,
+            users.Prescription.quantity,
+            users.Prescription.end_date
+        )
+        .outerjoin(users.User, users.Prescription.patient_id == users.User.id)
+        .outerjoin(users.Pharmacy, users.Prescription.pharmacy_id == users.Pharmacy.id)
+        .outerjoin(users.Medication, users.Prescription.medication_id == users.Medication.id)
+        .filter(users.Prescription.patient_id == current_user.id)
+        .filter(
+            (users.Prescription.end_date >= current_time) | 
+            (users.Prescription.end_date == None)
+        )
+        .all()
+    )
+    return prescriptions
+from pydantic import BaseModel
+
+# Добавь эту схему туда, где у тебя остальные (или прямо перед роутом)
+class ChatMessageCreate(BaseModel):
+    text: str
+    target_user_id: int | None = None
+
+@router.post("/home/chat/send")
+def send_message(
+    msg: ChatMessageCreate, # Используем чистую и надежную схему
+    db: Session = Depends(get_db),
+    current_user: users.User = Depends(get_current_user)
+):
+    # Если пишет админ и указал ID, отправляем туда. Иначе - в свой чат.
+    chat_owner_id = msg.target_user_id if current_user.role == "Admin" else current_user.id
+    
+    new_msg = users.SupportMessage(
+        user_id=chat_owner_id,
+        sender_id=current_user.id,
+        message=msg.text
+    )
+    db.add(new_msg)
+    db.commit()
+    return {"status": "sent"}
+
+@router.get("/home/chat/history/{user_id}")
+def get_chat_history(
+    user_id: int, 
+    db: Session = Depends(get_db),
+    # 1. Меняем RoleChecker на get_current_user, чтобы пускать всех авторизованных
+    current_user: users.User = Depends(get_current_user) 
+):
+    # 2. Проверяем права: разрешаем доступ, если это Админ ИЛИ если пользователь запрашивает свой личный чат
+    if current_user.role != "Admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к чужому чату")
+        
+    # 3. Получаем сообщения из базы данных
+    messages = db.query(users.SupportMessage).filter(users.SupportMessage.user_id == user_id).all()
+    
+    # 4. Превращаем объекты SQLAlchemy в обычный список словарей, чтобы избежать ошибки 500 при отправке JSON
+    return [{"sender_id": m.sender_id, "message": m.message} for m in messages]
+
