@@ -40,3 +40,9 @@ class DrugPrescriptionDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 class SupportMessege(BaseModel):
     messege: str
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    mail: Optional[str] = None
+    role: str

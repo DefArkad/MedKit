@@ -50,3 +50,4 @@ class RoleChecker:
     
 def generate_username(user_data: UserCreate):
     return translit(user_data.username, language_code='ru', reversed=False)
+

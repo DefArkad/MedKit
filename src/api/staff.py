@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, Query, APIRouter, status
-from typing import Annotated
+from typing import Annotated, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, update
 from pydantic import Field, ValidationError
@@ -7,7 +7,7 @@ import re
 
 from src.models import users
 from src.config.database.db_config import get_db, pwd_context, engine
-from src.schemas.user import UserCreate, UserRoleUpdate, MedicationsCreate, DrugPrescriptionCreate, PcharmaciesCreate
+from src.schemas.user import UserCreate, UserRoleUpdate, MedicationsCreate, DrugPrescriptionCreate, PcharmaciesCreate, UserResponse
 from src.core.token import create_access_token
 from src.dependencies import get_current_user, RoleChecker
 
@@ -37,6 +37,22 @@ def doctor_panel(current_role: Annotated[users.User, Depends(RoleChecker(need_ro
         "role": current_role.role
     }
 
+@router_staff.get("/home/get-users", response_model=List[UserResponse])
+def get_all_users(
+    search: str | None = Query(None, description="Поиск по имени пользователя"),
+    page: int = Query(1, ge=1, description="Номер страницы"),
+    db: Session = Depends(get_db),
+    current_user: users.User = Depends(RoleChecker(need_role="Admin"))
+):
+    limit = 10
+    skip = (page - 1)* limit
+    query = db.query(users.User)
+
+    if search:
+        query = query.filter(users.User.username.contains(search))
+    users_list = query.offset(skip).limit(limit).all()
+
+    return users_list
 
 @router_staff.patch("/home/change-role")
 def change_user_role(

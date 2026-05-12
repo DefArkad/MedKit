@@ -108,6 +108,8 @@ def get_my_active_prescriptions(
         .all()
     )
     return prescriptions
+
+
 from pydantic import BaseModel
 
 # Добавь эту схему туда, где у тебя остальные (или прямо перед роутом)

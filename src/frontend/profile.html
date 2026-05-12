@@ -7,11 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen p-4">
-    <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+    <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md text-center relative">
         <h1 class="text-3xl font-bold mb-4">Добро пожаловать!</h1>
         <p class="text-slate-400 mb-6">Это твой защищенный профиль.</p>
         
-        <!-- Информация о пользователе -->
         <div id="user-info" class="bg-slate-700 p-4 rounded-lg mb-6 hidden">
             <p class="text-sm text-slate-300">Твой ID: <span id="user-id" class="text-blue-400"></span></p>
             <p class="text-sm text-slate-300">Логин: <span id="user-name" class="text-blue-400"></span></p>
@@ -25,6 +24,11 @@
             <button onclick="getAdminPanelInfo()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition">
                 Админ панель
             </button>
+
+            <button id="view-users-btn" onclick="openUsersView()" class="bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-6 py-2 rounded-lg transition hidden">
+                Просмотр пользователей
+            </button>
+
             <button id="add-med-btn" onclick="addMedicationPrompt()" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition hidden">
                 Добавить лекарство
             </button>
@@ -46,16 +50,31 @@
             <h2 class="text-xl font-bold mb-3">Мои рецепты:</h2>
             <ul id="prescriptions-list" class="space-y-3 max-h-80 overflow-y-auto pr-2"></ul>
         </div>
+
+        <div id="users-container" class="mt-8 text-left hidden border-t border-slate-700 pt-4">
+            <h2 class="text-xl font-bold mb-3">Пользователи:</h2>
+            
+            <div class="flex gap-2 mb-3">
+                <input id="user-search-input" type="text" placeholder="Поиск по логину..." class="bg-slate-900 border border-slate-600 rounded px-2 py-1 w-full text-sm outline-none">
+                <button onclick="fetchUsers(1)" class="bg-fuchsia-600 hover:bg-fuchsia-700 px-4 py-1 rounded text-sm transition">Искать</button>
+            </div>
+            
+            <ul id="users-list" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
+            
+            <div class="flex justify-between items-center mt-4 border-t border-slate-700 pt-2">
+                <button id="prev-page-btn" onclick="changePage(-1)" class="text-sm bg-slate-700 px-3 py-1 rounded hover:bg-slate-600 disabled:opacity-50 transition">Назад</button>
+                <span id="current-page-display" class="text-sm font-bold text-slate-300">Стр. 1</span>
+                <button id="next-page-btn" onclick="changePage(1)" class="text-sm bg-slate-700 px-3 py-1 rounded hover:bg-slate-600 transition">Вперед</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Окно чата -->
     <div id="chat-window" class="fixed bottom-5 right-5 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl hidden flex flex-col z-50">
         <div class="bg-blue-600 p-3 rounded-t-xl font-bold flex justify-between items-center">
             <span>Поддержка</span>
             <button onclick="toggleChat()" class="text-xs">✖</button>
         </div>
         
-        <!-- Селектор для Админа -->
         <div id="admin-target-selector" class="p-2 bg-slate-700 hidden">
             <input id="target-user-id" type="number" placeholder="ID пользователя для ответа" class="w-full bg-slate-900 text-xs p-1 rounded outline-none border border-slate-600">
         </div>
@@ -68,16 +87,16 @@
         </div>
     </div>
 
-    <!-- Кнопка вызова чата[cite: 4] -->
     <button onclick="toggleChat()" class="fixed bottom-5 right-5 bg-blue-600 p-4 rounded-full shadow-lg z-40 hover:bg-blue-700 transition">💬</button>
 
 <script>
-    const API_BASE_URL = 'http://127.0.0.1:8000'; //[cite: 4]
+    const API_BASE_URL = 'http://127.0.0.1:8000';
 
-    // Логика управления кнопками
+    // Раскрываем кнопки (В идеале это делает getAdminPanelInfo, но дублируем для надежности)
     document.getElementById('add-med-btn').classList.remove('hidden');
     document.getElementById('create-prescription-btn').classList.remove('hidden');
     document.getElementById('add-pharmacy-btn').classList.remove('hidden');
+    document.getElementById('view-users-btn').classList.remove('hidden'); // Показываем новую кнопку
 
     // --- Функции рецептов и аптек ---
     async function addMedicationPrompt() {
@@ -90,9 +109,14 @@
             const response = await fetch(`${API_BASE_URL}/home/add-medications`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ name, description, prescription_required })
+                body: JSON.stringify({ 
+                    name: name, 
+                    description: description || null, 
+                    prescription: prescription_required 
+                })
             });
             if (response.ok) alert("Готово!");
+            else alert("Ошибка валидации: проверь консоль");
         } catch (e) { console.error(e); }
     }
 
@@ -100,27 +124,35 @@
         const patient_id = prompt("ID пациента:");
         const pharmacy_id = prompt("ID аптеки:");
         const medication_id = prompt("ID лекарства:");
+        const instruction = prompt("Инструкция (необязательно):"); 
         const quantity = prompt("Количество:");
         const end_date = prompt("До (ГГГГ-ММ-ДД ТТ:ММ):", "2026-12-31 23:59");
+        
         if (!patient_id || !pharmacy_id || !medication_id || !quantity || !end_date) return;
+        
         const token = localStorage.getItem('token');
         try {
-            await fetch(`${API_BASE_URL}/home/new_drug_prescription`, {
+            const response = await fetch(`${API_BASE_URL}/home/new_drug_prescription`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     patient_id: parseInt(patient_id),
                     pharmacy_id: parseInt(pharmacy_id),
                     medication_id: parseInt(medication_id),
+                    instruction: instruction || null, 
                     quantity: parseInt(quantity),
                     end_date: end_date.replace(' ', 'T')
                 })
             });
+
+            if (response.ok) alert("Рецепт успешно создан!");
+            else alert("Ошибка создания рецепта");
         } catch (e) { console.error(e); }
     }
 
     async function getMyPrescriptions() {
         const token = localStorage.getItem('token');
+        document.getElementById('users-container').classList.add('hidden'); // Скрываем юзеров
         try {
             const response = await fetch(`${API_BASE_URL}/home/my_prescriptions`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -138,15 +170,89 @@
         } catch (e) { console.error(e); }
     }
 
-    // --- Логика чата[cite: 4] ---
-// --- Логика чата ---
-    let currentChatInterval = null;
-    let currentUserData = null; // Сохраняем данные пользователя здесь, а не в HTML
+    async function addPharmacyPrompt() {
+        const name = prompt("Название аптеки:");
+        if (!name) return;
+        const address = prompt("Адрес:");
+        if (!address) return;
 
-    // Надежная функция: берем данные напрямую с сервера
-    async function initChatUser() {
-        if (currentUserData) return currentUserData; // Если уже загрузили, отдаем сразу
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`${API_BASE_URL}/home/new_pharmacies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ name: name, address: address })
+            });
+            if (response.ok) alert("Аптека успешно добавлена в базу!");
+            else alert("Ошибка сервера");
+        } catch (e) { console.error(e); }
+    }
+
+    // --- Логика просмотра пользователей (Пагинация и Поиск) ---
+    let currentUserPage = 1;
+
+    function openUsersView() {
+        document.getElementById('prescriptions-container').classList.add('hidden'); // Скрываем рецепты
+        document.getElementById('users-container').classList.remove('hidden');
+        fetchUsers(1);
+    }
+
+    async function fetchUsers(page) {
+        if (page < 1) return;
+        const token = localStorage.getItem('token');
+        const searchQuery = document.getElementById('user-search-input').value.trim();
         
+        try {
+            let url = `${API_BASE_URL}/home/get-users?page=${page}`;
+            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const users = await response.json();
+                const list = document.getElementById('users-list');
+                
+                // Если мы перелистнули вперед, а там пусто - отменяем действие
+                if (users.length === 0 && page > 1) {
+                    alert("Больше пользователей нет");
+                    return; 
+                }
+
+                currentUserPage = page;
+                document.getElementById('current-page-display').innerText = `Стр. ${currentUserPage}`;
+                document.getElementById('prev-page-btn').disabled = (currentUserPage === 1);
+
+                if (users.length === 0) {
+                    list.innerHTML = '<li class="text-slate-400 text-center mt-4">Пользователи не найдены</li>';
+                } else {
+                    list.innerHTML = users.map(u => `
+                        <li class="bg-slate-700 p-2 rounded-lg text-sm shadow flex justify-between items-center border-l-4 border-fuchsia-500">
+                            <div>
+                                <p class="text-fuchsia-400 font-bold">ID: ${u.id} | ${u.username}</p>
+                                <p class="text-slate-300 text-xs">${u.mail ? u.mail : 'Почта не указана'}</p>
+                            </div>
+                            <span class="bg-slate-800 px-2 py-1 rounded text-xs text-green-400 border border-slate-600">${u.role}</span>
+                        </li>`).join('');
+                }
+            } else {
+                const err = await response.json();
+                alert("Ошибка: " + (err.detail || "Нет доступа"));
+            }
+        } catch (e) { console.error("Ошибка при получении пользователей:", e); }
+    }
+
+    function changePage(delta) {
+        fetchUsers(currentUserPage + delta);
+    }
+
+    // --- Логика чата ---
+    let currentChatInterval = null;
+    let currentUserData = null; 
+
+    async function initChatUser() {
+        if (currentUserData) return currentUserData; 
         const token = localStorage.getItem('token');
         try {
             const response = await fetch(`${API_BASE_URL}/users/me`, {
@@ -156,9 +262,7 @@
                 currentUserData = await response.json();
                 return currentUserData;
             }
-        } catch (e) {
-            console.error("Ошибка получения данных пользователя:", e);
-        }
+        } catch (e) { console.error(e); }
         return null;
     }
 
@@ -167,9 +271,7 @@
         const isHidden = chat.classList.toggle('hidden');
         
         if (!isHidden) {
-            // При открытии чата 100% получаем ID и роль с бэкенда
             const user = await initChatUser();
-            
             if (user && user.role === "Admin") {
                 document.getElementById('admin-target-selector').classList.remove('hidden');
             }
@@ -187,11 +289,7 @@
 
         const token = localStorage.getItem('token');
         const user = await initChatUser();
-        
-        if (!user) {
-            alert("Не удалось получить ваш ID. Перезагрузите страницу.");
-            return;
-        }
+        if (!user) return;
 
         const target_user_id = user.role === "Admin" ? parseInt(targetInput.value) : null;
 
@@ -204,28 +302,21 @@
             if (response.ok) {
                 input.value = '';
                 loadHistory();
-            } else {
-                console.error("Ошибка сервера:", await response.text());
             }
-        } catch (e) { console.error("Ошибка отправки:", e); }
+        } catch (e) { console.error(e); }
     }
 
     async function loadHistory() {
         const token = localStorage.getItem('token');
         const user = await initChatUser();
-        
-        if (!user || !user.id) {
-            console.warn("Ожидание авторизации...");
-            return;
-        }
+        if (!user || !user.id) return;
 
         const myId = user.id;
-        let targetId = myId; // Обычный пользователь грузит свой чат
+        let targetId = myId; 
 
-        // Если это админ, грузим чат того ID, который он ввел
         if (user.role === "Admin") {
             const adminInputTarget = parseInt(document.getElementById('target-user-id').value);
-            if (isNaN(adminInputTarget)) return; // Если админ ничего не ввел — ничего не грузим
+            if (isNaN(adminInputTarget)) return; 
             targetId = adminInputTarget;
         }
 
@@ -248,7 +339,7 @@
                     container.scrollTop = container.scrollHeight;
                 }
             }
-        } catch (e) { console.error("Ошибка загрузки истории:", e); }
+        } catch (e) { console.error(e); }
     }
 
     function startChatPolling() {
