@@ -1,0 +1,56 @@
+
+@font-face{
+	font-family: 'Cantarell';
+	src: url('../fonts/Cantarell/Cantarell-Regular.ttf') format('woff');
+	font-weight: normal;
+	font-style: normal;
+}
+
+@font-face{
+	font-family: 'SNPro';
+	src: url('../fonts/SNPro/static/SNPro-Medium.ttf') format('woff');
+	font-weight: normal;
+	font-style: normal;
+}
+
+body{
+	font-family: 'SNPro';
+	background: linear-gradient(to bottom, #1d1d99 20%, #9e2727 90%);
+	color: #67a7d8;
+	
+	display: grid;
+	min-height: 100vh;
+	align-content: center;
+	justify-content:center;
+	
+	margin: 0;
+	padding: 0;
+}
+
+input{
+	background-color: #2e2e54;
+	color: #67a7d8;
+}
+
+button{
+	font-family: 'SNPro';
+	border-radius: 20%;
+	border-color: #1c1c3c;
+	background-color: #424290;
+	color: #67a7d8;
+	cursor: pointer;
+}
+.roleBtn{
+	width: 15vh;
+	height: 15vh;
+}
+
+.UI:hover{
+	cursor: default;
+}
+
+.container{
+	background-color: #00000024;
+	border-radius: 15%;
+	padding: 10px;
+}
